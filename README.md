@@ -1,358 +1,159 @@
 # ⚡ Store Provisioning Platform
 
-A complete Kubernetes-based platform for provisioning WooCommerce stores with a single click.
+A high-performance, automated platform for provisioning and managing WooCommerce stores on Kubernetes with a single click. This platform orchestrates the entire lifecycle of a store—from infrastructure deployment to product seeding—providing a production-ready environment in minutes.
 
-## 🎯 What This Does
-
-- **User clicks "Create Store"** → Platform automatically provisions a fully functional WooCommerce store
-- **2-5 minutes later** → Store is ready at `http://store-{id}.127.0.0.1.nip.io`
-- **Fully configured** → Products, payment methods, admin access, everything ready to use
-
-## 🛠️ Tech Stack
-
-- **Backend**: Node.js 18 + Express + PostgreSQL 15
-- **Frontend**: React 18 + Vite 5 + Tailwind CSS 3
-- **Infrastructure**: Kubernetes (Kind) + Docker
-- **Per-Store**: MySQL 8.0 + WordPress 6.4 + WooCommerce
-
-## 📋 Prerequisites
-
-Before you begin, install these tools:
-
-1. **Docker Desktop** - [Download](https://www.docker.com/products/docker-desktop/)
-2. **Node.js 18+** - [Download](https://nodejs.org/)
-3. **Kind** - [Installation Guide](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
-   ```bash
-   # Windows (PowerShell as Admin)
-   choco install kind
-   
-   # Or download from: https://github.com/kubernetes-sigs/kind/releases
-   ```
-4. **kubectl** - [Installation Guide](https://kubernetes.io/docs/tasks/tools/)
-   ```bash
-   # Windows (PowerShell as Admin)
-   choco install kubernetes-cli
-   ```
-
-## 🚀 Quick Start
-
-### Step 1: Start PostgreSQL
-
-```bash
-docker compose up -d
-```
-
-### Step 2: Create Kind Cluster
-
-```bash
-kind create cluster --config kind-config.yaml
-```
-
-### Step 3: Install NGINX Ingress Controller
-
-```bash
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-```
-
-Wait for ingress to be ready:
-```bash
-kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=300s
-```
-
-### Step 4: Install Dependencies
-
-**Backend:**
-```bash
-cd backend
-npm install
-```
-
-**Dashboard:**
-```bash
-cd dashboard
-npm install
-```
-
-### Step 5: Start the Application
-
-**Terminal 1 - Backend:**
-```bash
-cd backend
-npm run dev
-```
-
-**Terminal 2 - Dashboard:**
-```bash
-cd dashboard
-npm run dev
-```
-
-### Step 6: Open Dashboard
-
-Open your browser to: **http://localhost:3001**
-
-## 🎮 Usage
-
-1. Click **"+ Create Store"**
-2. Enter a store name (e.g., "My Coffee Shop")
-3. Click **"🚀 Create Store"**
-4. Wait 2-5 minutes while watching the status
-5. Click **"🛒 Open Store"** when ready
-6. Admin login: `admin` / `Admin@123`
-
-## 🔍 Verification Commands
-
-```bash
-# Check Kind cluster
-kind get clusters
-
-# Check ingress controller
-kubectl get pods -n ingress-nginx
-
-# Check PostgreSQL
-docker ps
-
-# Check backend API
-curl http://localhost:3000/health
-
-# Watch Kubernetes resources in real-time
-kubectl get pods --all-namespaces --watch
-
-# List all stores
-kubectl get namespaces | grep store-
-```
-
-## 📁 Project Structure
-
-```
-store-platform/
-├── backend/
-│   ├── package.json
-│   ├── .env
-│   ├── server.js
-│   ├── config/
-│   │   └── database.js
-│   └── services/
-│       ├── kubernetesClient.js   # Kubernetes API wrapper
-│       ├── orchestrator.js        # Provisioning logic
-│       └── stores.js              # Express routes
-│
-├── dashboard/
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── src/
-│       ├── main.jsx
-│       ├── index.css
-│       └── App.jsx                # Complete React UI
-│
-├── kind-config.yaml               # Kubernetes cluster config
-├── docker-compose.yml             # PostgreSQL config
-└── setup.sh                       # Automated setup script
-```
+---
 
 ## 🏗️ Architecture
 
-```
-User Browser (React Dashboard)
-        ↓
-Backend API (Express)
-        ↓
-   ┌────┴────┐
-   ↓         ↓
-PostgreSQL  Kubernetes Cluster (Kind)
-(Metadata)       ↓
-            ┌────┴────┐
-            ↓         ↓
-      Namespace 1  Namespace 2
-      - MySQL      - MySQL
-      - WordPress  - WordPress
-      - Ingress    - Ingress
-```
+The platform follows a modern microservices-inspired architecture, leveraging Kubernetes for container orchestration and Helm for package management.
 
-## 🔧 Configuration
+```mermaid
+graph TD
+    User((User)) -->|Interacts| Dashboard[React Dashboard]
+    Dashboard -->|API Requests| API[Express API Server]
+    
+    subgraph "Control Plane"
+        API -->|Metadata & Logs| DB[(PostgreSQL)]
+        API -->|Deployments| Helm[Helm CLI]
+        API -->|Monitoring| Kubectl[Kubectl CLI]
+    end
 
-### Backend (.env)
-```
-PORT=3000
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=store_platform
-DB_USER=postgres
-DB_PASSWORD=postgres
-CLUSTER_IP=127.0.0.1
-CORS_ORIGIN=http://localhost:3001
+    subgraph "Kubernetes Cluster (Kind)"
+        Helm -->|Provision| Namespace[Namespace per Store]
+        
+        subgraph Namespace
+            Ingress[NGINX Ingress] -->|Routes| WP[WordPress Pod]
+            WP -->|Data| MySQL[MySQL Pod]
+            WP --- PVC[Persistent Volume]
+            SetupJob[Setup Job] -->|Configures| WP
+            WP --- WPCLI[WP-CLI / Product Gen]
+        end
+    end
+    
+    API -->|Status Updates| Dashboard
 ```
 
-### Dashboard (vite.config.js)
-```javascript
-server: {
-  port: 3001,
-  proxy: {
-    '/api': { target: 'http://localhost:3000' }
-  }
-}
-```
+---
 
-## 🐛 Troubleshooting
+## 🌟 Key Features
 
-### PostgreSQL Connection Error
+- **🚀 One-Click Provisioning**: Automates the creation of a full WooCommerce stack (WordPress + MySQL + Ingress).
+- **🛡️ Namespace Isolation**: Each store runs in its own dedicated Kubernetes namespace for security and resource management.
+- **📦 Automated Seeding**: Automatically generates products and configures payment methods (COD) upon creation.
+- **📊 Real-time Monitoring**: Track provisioning status, logs, and events directly from the dashboard.
+- **🛠️ Resource Management**: Uses Kubernetes ResourceQuotas and Limits to ensure cluster stability.
+- **🐳 Local Development**: Optimized for running on **Kind** (Kubernetes in Docker).
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons.
+- **Backend**: Node.js 18, Express, PostgreSQL 15.
+- **Infrastructure**: Kubernetes (Kind), Helm 3, Docker.
+- **Store Stack**: WordPress 6.4, WooCommerce, MySQL 8.0, WP-CLI.
+
+---
+
+## 📋 Prerequisites
+
+Ensure you have the following installed:
+
+1.  **Docker Desktop**: [Download](https://www.docker.com/products/docker-desktop/)
+2.  **Node.js 18+**: [Download](https://nodejs.org/)
+3.  **Kind**: `choco install kind` (Windows) or [Guide](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
+4.  **kubectl**: `choco install kubernetes-cli` (Windows) or [Guide](https://kubernetes.io/docs/tasks/tools/)
+5.  **Helm**: `choco install kubernetes-helm` (Windows) or [Guide](https://helm.sh/docs/intro/install/)
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Initialize Infrastructure
+
+First, start the metadata database and create the Kubernetes cluster.
+
 ```bash
-# Restart PostgreSQL
-docker compose down
-docker compose up -d
-```
+# Start PostgreSQL
+docker-compose up -d
 
-### Kind Cluster Not Found
-```bash
-# Recreate cluster
-kind delete cluster --name store-platform
-kind create cluster --config kind-config.yaml
-```
+# Create Kind Cluster
+kind create cluster --name store-platform --config kind-config-alt.yaml
 
-### Ingress Not Working
-```bash
-# Check ingress controller
-kubectl get pods -n ingress-nginx
-
-# Reinstall if needed
-kubectl delete namespace ingress-nginx
+# Install NGINX Ingress Controller
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+# Wait for Ingress to be ready
+kubectl wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=300s
 ```
 
-### Store Stuck in "Provisioning"
+### 2. Set Up Services
+
+Install dependencies for both the backend and the dashboard.
+
 ```bash
-# Check pod status
-kubectl get pods -n store-{id}
+# Backend
+cd backend
+npm install
 
-# Check pod logs
-kubectl logs -n store-{id} -l app=woocommerce
-
-# Check events
-kubectl get events -n store-{id} --sort-by='.lastTimestamp'
+# Dashboard
+cd ../dashboard
+npm install
 ```
 
-## 🧪 Testing
+### 3. Launch the Platform
 
-### Create a Test Store via API
+Open two terminals to run the backend and frontend simultaneously.
+
+**Terminal 1 (Backend):**
 ```bash
-curl -X POST http://localhost:3000/api/stores \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test Store","type":"woocommerce"}'
+cd backend
+npm run dev
 ```
 
-### List All Stores
+**Terminal 2 (Dashboard):**
 ```bash
-curl http://localhost:3000/api/stores
+cd dashboard
+npm run dev
 ```
 
-### Get Metrics
-```bash
-curl http://localhost:3000/api/metrics
+---
+
+## 🎮 Usage
+
+1.  Open your browser to **http://localhost:3001**.
+2.  Click **"+ Create Store"** in the top right.
+3.  Enter a name for your store (e.g., "Tech Haven").
+4.  Monitor the **Live Events** log as the platform:
+    -   Installs the Helm chart.
+    -   Configures the WordPress environment.
+    -   Generates sample products.
+5.  Once the status turns **Ready**, click **"🛒 Open Store"** to visit your new WooCommerce site.
+
+---
+
+## 📂 Project Structure
+
+```text
+├── backend/            # Express API, Orchestration logic, and DB migrations
+├── dashboard/          # React/Vite frontend for store management
+├── helm/               # WooCommerce Helm chart templates
+│   └── woocommerce-store/
+│       ├── templates/  # K8s manifests (WP, MySQL, Ingress, RBAC)
+│       └── values.yaml # Default configurations
+├── docker-compose.yml  # Local PostgreSQL setup
+└── kind-config-alt.yaml # Kubernetes cluster configuration
 ```
 
-## 🗑️ Cleanup
+---
 
-### Delete a Store
-The dashboard has a delete button, or use the API:
-```bash
-curl -X DELETE http://localhost:3000/api/stores/{store-id}
-```
+## 🛡️ Troubleshooting
 
-### Delete Everything
-```bash
-# Stop backend and dashboard (Ctrl+C in terminals)
+- **Ingress Issues**: Ensure port 8080 (or the port defined in `kind-config-alt.yaml`) is not in use by another application.
+- **Database Connection**: Verify PostgreSQL is running with `docker ps`.
+- **Pod Failures**: Use `kubectl get pods -A` to check the status of store-specific namespaces.
 
-# Delete Kind cluster
-kind delete cluster --name store-platform
+---
 
-# Stop PostgreSQL
-docker compose down
-
-# Remove PostgreSQL data
-docker compose down -v
-```
-
-## 📊 Features
-
-- ✅ One-click store provisioning
-- ✅ Real-time status updates (5-second polling)
-- ✅ Isolated Kubernetes namespaces per store
-- ✅ Automatic WooCommerce configuration
-- ✅ Pre-installed sample products
-- ✅ Cash on Delivery payment enabled
-- ✅ Admin credentials auto-configured
-- ✅ Automatic DNS via nip.io
-- ✅ Dark theme dashboard
-- ✅ Store metrics and monitoring
-- ✅ Event logging per store
-
-## 🔐 Default Credentials
-
-**WordPress Admin:**
-- Username: `admin`
-- Password: `Admin@123`
-- URL: `http://store-{id}.127.0.0.1.nip.io/wp-admin`
-
-**PostgreSQL:**
-- Host: `localhost:5432`
-- Database: `store_platform`
-- User: `postgres`
-- Password: `postgres`
-
-## 🚦 Store Lifecycle
-
-1. **Provisioning** (2-5 minutes)
-   - Create namespace
-   - Deploy MySQL
-   - Deploy WordPress
-   - Configure WooCommerce
-   - Create ingress
-
-2. **Ready**
-   - Store accessible via URL
-   - Admin panel available
-   - Products created
-   - Payment methods enabled
-
-3. **Deleting**
-   - Remove namespace
-   - Clean up all resources
-   - Update database status
-
-## 📈 Scaling
-
-- **Maximum stores**: 10 (configurable in `backend/services/stores.js`)
-- **Per-store resources**:
-  - MySQL: 256Mi-512Mi RAM, 100m-500m CPU
-  - WordPress: 256Mi-512Mi RAM, 100m-500m CPU
-  - Storage: 5Gi (MySQL) + 10Gi (WordPress)
-
-## 🎓 Learning Resources
-
-- [Kubernetes Basics](https://kubernetes.io/docs/tutorials/kubernetes-basics/)
-- [Kind Documentation](https://kind.sigs.k8s.io/)
-- [WooCommerce Docs](https://woocommerce.com/documentation/)
-- [WP-CLI Commands](https://developer.wordpress.org/cli/commands/)
-
-## 📝 License
-
-MIT
-
-## 🤝 Contributing
-
-This is a demonstration project. Feel free to fork and modify for your needs.
-
-## ⚠️ Production Considerations
-
-This setup is for **local development and learning**. For production:
-
-- Use managed Kubernetes (EKS, GKE, AKS)
-- Implement proper authentication
-- Use SSL/TLS certificates
-- Set up monitoring and logging
-- Implement backup strategies
-- Use secrets management (Vault, etc.)
-- Configure resource limits properly
-- Implement rate limiting
-- Add health checks and auto-scaling
+Built with ❤️ for rapid commerce experimentation.
