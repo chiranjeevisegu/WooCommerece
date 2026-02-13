@@ -1,0 +1,66 @@
+# Default values for woocommerce-store
+# This is a YAML-formatted file.
+
+# Store configuration
+storeName: "My WooCommerce Store"
+storeId: "store-default"
+
+# MySQL configuration
+mysql:
+  image: mysql:8.0
+  rootPassword: "changeme123"
+  database: "woocommerce"
+  user: "wpuser"
+  password: "wppass123"
+  storage:
+    size: 5Gi
+    storageClass: "" # Use default storage class
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+# WordPress configuration
+wordpress:
+  image: wordpress:php8.2-apache
+  storage:
+    size: 10Gi
+    storageClass: "" # Use default storage class
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "400m"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  host: "{{ .Values.storeId }}.127.0.0.1.nip.io"
+  tls:
+    enabled: false
+    secretName: ""
+
+# Security context
+securityContext:
+  runAsNonRoot: false # WordPress needs root for now
+  fsGroup: 33 # www-data group
+
+# Resource quotas per namespace
+resourceQuota:
+  enabled: true
+  limits:
+    cpu: "2"
+    memory: "4Gi"
+    persistentvolumeclaims: "5"
+    pods: "10"
+
+# Service accounts
+serviceAccount:
+  create: true
+  name: ""

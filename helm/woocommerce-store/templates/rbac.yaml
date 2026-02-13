@@ -1,0 +1,32 @@
+{{- if .Values.serviceAccount.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "woocommerce-store.serviceAccountName" . }}-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "woocommerce-store.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "woocommerce-store.serviceAccountName" . }}-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "woocommerce-store.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "woocommerce-store.serviceAccountName" . }}-role
+subjects:
+- kind: ServiceAccount
+  name: {{ include "woocommerce-store.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

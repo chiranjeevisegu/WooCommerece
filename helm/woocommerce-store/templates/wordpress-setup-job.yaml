@@ -1,0 +1,146 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-setup
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "woocommerce-store.labels" . | nindent 4 }}
+    app: wordpress-setup
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 5
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        app: wordpress-setup
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-wordpress
+        image: busybox:1.35
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for WordPress to be ready..."
+          sleep 30
+          until wget -q --spider http://{{ .Release.Name }}-wordpress:80/wp-admin/install.php 2>/dev/null; do
+            echo "WordPress not ready, waiting..."
+            sleep 10
+          done
+          echo "WordPress is ready!"
+        resources:
+          limits:
+            cpu: 100m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+      containers:
+      - name: setup-wordpress
+        image: wordpress:cli-2.9-php8.2
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          cd /var/www/html
+          
+          echo "Checking if WordPress is already installed..."
+          if wp core is-installed --allow-root 2>/dev/null; then
+            echo "WordPress already installed, exiting..."
+            exit 0
+          fi
+          
+          echo "Installing WordPress core..."
+          wp core install \
+            --url="http://{{ .Release.Name }}.127.0.0.1.nip.io:8080" \
+            --title="{{ .Values.storeName }}" \
+            --admin_user=admin \
+            --admin_password=Admin@123 \
+            --admin_email=admin@store.local \
+            --skip-email \
+            --allow-root
+          
+          echo "Updating WordPress core..."
+          wp core update --allow-root
+
+          echo "Installing WooCommerce..."
+          wp plugin install woocommerce --activate --allow-root
+          
+          echo "Installing Storefront theme..."
+          wp theme install storefront --activate --allow-root
+          
+          echo "Configuring WooCommerce..."
+          wp option update woocommerce_store_address "123 Store Street" --allow-root
+          wp option update woocommerce_store_city "Mumbai" --allow-root
+          wp option update woocommerce_default_country "IN" --allow-root
+          wp option update woocommerce_currency "INR" --allow-root
+          wp option update woocommerce_calc_taxes "no" --allow-root
+          
+          echo "Enabling COD payment..."
+          wp option update woocommerce_cod_settings '{"enabled":"yes","title":"Cash on Delivery","description":"Pay with cash upon delivery"}' --format=json --allow-root
+          
+          echo "Creating sample products..."
+          wp wc product create \
+            --name="Premium T-Shirt" \
+            --type=simple \
+            --regular_price=999 \
+            --description="High quality cotton t-shirt available in multiple colors" \
+            --short_description="Comfortable cotton t-shirt" \
+            --status=publish \
+            --allow-root
+          
+          wp wc product create \
+            --name="Running Shoes" \
+            --type=simple \
+            --regular_price=2499 \
+            --description="Professional running shoes with advanced cushioning" \
+            --short_description="Lightweight running shoes" \
+            --status=publish \
+            --allow-root
+          
+          wp wc product create \
+            --name="Travel Backpack" \
+            --type=simple \
+            --regular_price=1499 \
+            --description="Durable travel backpack with 30L capacity" \
+            --short_description="30L capacity backpack" \
+            --status=publish \
+            --allow-root
+          
+          echo "Setting permalinks..."
+          wp rewrite structure '/%postname%/' --allow-root
+          wp rewrite flush --allow-root
+          
+          echo "✅ WordPress setup complete!"
+        env:
+        - name: WORDPRESS_DB_HOST
+          value: {{ .Release.Name }}-mysql:3306
+        - name: WORDPRESS_DB_NAME
+          value: {{ .Values.mysql.database }}
+        - name: WORDPRESS_DB_USER
+          value: {{ .Values.mysql.user }}
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-mysql-secret
+              key: mysql-password
+        volumeMounts:
+        - name: wordpress-data
+          mountPath: /var/www/html
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+      volumes:
+      - name: wordpress-data
+        persistentVolumeClaim:
+          claimName: {{ .Release.Name }}-wordpress-pvc
+      securityContext:
+        runAsUser: 33
+        fsGroup: 33

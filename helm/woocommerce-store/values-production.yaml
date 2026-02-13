@@ -1,0 +1,48 @@
+# Production values for woocommerce-store
+# Override values.yaml for production VPS deployment
+
+# Ingress configuration for production
+ingress:
+  enabled: true
+  className: nginx
+  host: "{{ .Values.storeId }}.yourdomain.com" # Change to your domain
+  tls:
+    enabled: true
+    secretName: "{{ .Values.storeId }}-tls"
+
+# MySQL configuration for production
+mysql:
+  rootPassword: "" # Set via --set or secret
+  password: "" # Set via --set or secret
+  storage:
+    size: 10Gi # Larger storage for production
+    storageClass: "local-path" # k3s default
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# WordPress configuration for production
+wordpress:
+  storage:
+    size: 20Gi # Larger storage for production
+    storageClass: "local-path" # k3s default
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "400m"
+    limits:
+      memory: "1Gi"
+      cpu: "800m"
+
+# Resource quotas for production
+resourceQuota:
+  enabled: true
+  limits:
+    cpu: "4"
+    memory: "8Gi"
+    persistentvolumeclaims: "10"
+    pods: "20"
