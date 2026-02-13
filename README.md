@@ -2,6 +2,9 @@
 
 A high-performance, automated platform for provisioning and managing WooCommerce stores on Kubernetes with a single click. This platform orchestrates the entire lifecycle of a store—from infrastructure deployment to product seeding—providing a production-ready environment in minutes.
 
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/bd6b7fea-494b-4a3f-8799-fe8ded49097e" />
+<img width="1919" height="973" alt="image" src="https://github.com/user-attachments/assets/3331fe97-12e4-4e85-a106-088250b02eeb" />
+
 ---
 
 ## 🏗️ Architecture
